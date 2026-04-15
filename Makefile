@@ -1,0 +1,63 @@
+export TZ=UTC
+
+.PHONY: help
+help:
+	@grep -E '^[a-zA-Z0-9 -]+:.*#'  Makefile | while read -r l; do printf "\033[1;32m$$(echo $$l | cut -f 1 -d':')\033[00m:$$(echo $$l | cut -f 2- -d'#')\n"; done
+
+.PHONY: docker-up
+docker-up: # Spin up local services with Docker.
+	docker-compose up -d
+
+.PHONY: docker-down
+docker-down: # Tear down local services.
+	docker-compose down -v
+
+.PHONY: create-table
+create-table: # Create a transactions table in PostgreSQL.
+	docker exec postgres psql -U postgres -c " \
+		CREATE TABLE IF NOT EXISTS transactions ( \
+			id SERIAL PRIMARY KEY, \
+			amount DECIMAL(10, 2) NOT NULL, \
+			timestamp TIMESTAMP NOT NULL DEFAULT NOW() \
+		);"
+
+.PHONY: populate-table
+populate-table: # Populate the transactions table with dummy records.
+	docker exec postgres psql -U postgres -c "INSERT INTO transactions (amount) VALUES (100.50), (250.75), (89.99), (500.00), (33.25)"
+
+.PHONY: read-table
+read-table: # Read the transactions table.
+	docker exec postgres psql -U postgres -c "SELECT * FROM transactions"
+
+.PHONY: psql
+psql: # Run the PostgreSQL console.
+	docker exec -it postgres psql -U postgres
+
+.PHONY: register-connector
+register-connector: # Register the Debezium PostgreSQL CDC Kafka Connector.
+	curl --fail -X POST http://localhost:8083/connectors \
+		-H "Content-Type: application/json" \
+		-d '{ \
+				"name": "postgres-connector", \
+				"config": { \
+					"connector.class": "io.debezium.connector.postgresql.PostgresConnector", \
+					"database.hostname": "postgres", \
+					"database.port": "5432", \
+					"database.user": "postgres", \
+					"database.password": "postgres", \
+					"database.dbname": "postgres", \
+					"topic.prefix": "postgres", \
+					"table.include.list": "public.transactions", \
+					"plugin.name": "pgoutput" \
+				} \
+			}'
+
+.PHONY: read-cdc-topic
+read-cdc-topic: # Read CDC events from the transactions topic.
+	docker exec schema-registry kafka-avro-console-consumer \
+		--bootstrap-server broker:29092 \
+		--topic postgres.public.transactions \
+		--from-beginning \
+		--property schema.registry.url=http://schema-registry:8081 \
+		--property print.key=true \
+		--property key.separator=" | "
