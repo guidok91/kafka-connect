@@ -17,7 +17,7 @@ create-table: # Create a transactions table in PostgreSQL.
 	docker exec postgres psql -U postgres -c " \
 		CREATE TABLE IF NOT EXISTS transactions ( \
 			id SERIAL PRIMARY KEY, \
-			amount DECIMAL(10, 2) NOT NULL, \
+			amount DOUBLE PRECISION NOT NULL, \
 			timestamp TIMESTAMP NOT NULL DEFAULT NOW() \
 		);"
 
