@@ -51,13 +51,3 @@ register-connector: # Register the Debezium PostgreSQL CDC Kafka Connector.
 					"plugin.name": "pgoutput" \
 				} \
 			}'
-
-.PHONY: read-cdc-topic
-read-cdc-topic: # Read CDC events from the transactions topic.
-	docker exec schema-registry kafka-avro-console-consumer \
-		--bootstrap-server broker:29092 \
-		--topic postgres.public.transactions \
-		--from-beginning \
-		--property schema.registry.url=http://schema-registry:8081 \
-		--property print.key=true \
-		--property key.separator=" | "
